@@ -4,18 +4,37 @@ import platform
 import json
 import urllib.request
 import urllib.error
+import socket
+import os
+import shutil
+import getpass
 
 # Configuration
 SERVER_URL = "https://minecraft.puiustin.com/api/report"
 
 def collect_telemetry():
     """Collects basic, non-sensitive system information."""
+    
+    # Disk Usage
+    try:
+        total, used, free = shutil.disk_usage("/")
+        disk_info = {
+            "total_gb": total // (2**30),
+            "free_gb": free // (2**30)
+        }
+    except:
+        disk_info = "Unknown"
+
     return {
+        "hostname": socket.gethostname(),
+        "current_user": getpass.getuser(),
         "os_system": platform.system(),
         "os_release": platform.release(),
         "os_version": platform.version(),
         "machine_arch": platform.machine(),
         "processor": platform.processor(),
+        "cpu_count": os.cpu_count(),
+        "disk_info": disk_info,
         "python_version": sys.version,
         "timestamp": time.time()
     }
