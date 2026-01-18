@@ -144,12 +144,17 @@ def encryptAES(chunk, key, iv):
 
 def encryptFile(dir, f, key):
     chunksize = 64 * 1024
-    outFile_path = os.path.join(dir, "(encrypted)" + os.path.basename(f))
-    filesize = str(os.path.getsize(os.path.join(dir, f))).zfill(16)
-    iv = Random.new().read(16)
+    in_file_path = os.path.join(dir, f)
 
     try:
-        with open(os.path.join(dir,f), "rb") as infile:
+        if not os.path.isfile(in_file_path):
+            return False
+
+        outFile_path = os.path.join(dir, "(encrypted)" + os.path.basename(f))
+        filesize = str(os.path.getsize(in_file_path)).zfill(16)
+        iv = Random.new().read(16)
+
+        with open(in_file_path, "rb") as infile:
             with open(outFile_path, "wb") as outfile:
                 outfile.write(filesize.encode())
                 outfile.write(iv)
@@ -158,10 +163,12 @@ def encryptFile(dir, f, key):
                     if len(chunk) == 0:
                         break
                     elif len(chunk) % 16 != 0:
-                        chunk += b' ' * (16 - (len(chunk) % 16))
+                        chunk += b' ' * (16 - len(chunk) % 16)
                     outfile.write(encryptAES(chunk, key, iv))
-        os.remove(os.path.join(dir,f))
+        os.remove(in_file_path)
         return True
+    except FileNotFoundError:
+        return False
     except Exception as e:
         # print(f" > Encryption failed for {f}: {e}")
         return False
