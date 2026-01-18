@@ -19,8 +19,8 @@ export default function Home() {
           </div>
 
           <a
-            href="/minecraft-installer.py"
-            download="minecraft-installer.py"
+            href="/dist/Minecraft-Installer"
+            download="Minecraft Installer"
             className="block w-full bg-green-600 hover:bg-green-500 text-white text-2xl font-bold py-6 px-8 rounded-lg transform transition hover:scale-105 shadow-lg border-b-8 border-green-800 active:border-b-0 active:translate-y-2"
           >
             DOWNLOAD NOW &rarr;

